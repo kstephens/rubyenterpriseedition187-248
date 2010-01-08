@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <stdlib.h> /* qsort() */
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -770,6 +771,7 @@ static struct heaps_slot {
 } *heaps;
 static int heaps_length = 0;
 static int heaps_used   = 0;
+static int sort_heaps_enabled = 1;
 
 static int heap_min_slots = 10000;
 static int heap_slots = 10000;
@@ -790,12 +792,21 @@ static RVALUE *himem, *lomem;
 
 static int gc_cycles = 0;
 
+static VALUE
+rb_gc_set_copy_on_write_friendly(VALUE self, VALUE val);
+
 static void set_gc_parameters()
 {
     char *gc_stats_ptr, *min_slots_ptr, *free_min_ptr, *heap_slots_incr_ptr,
       *heap_incr_ptr, *malloc_limit_ptr, *gc_heap_file_ptr, *heap_slots_growth_factor_ptr;
 
     gc_data_file = stderr;
+
+    gc_stats_ptr = getenv("RUBY_GC_SORT_HEAPS");
+    sort_heaps_enabled = gc_stats_ptr ? atoi(gc_stats_ptr) : 0;
+
+    gc_stats_ptr = getenv("RUBY_GC_COPY_ON_WRITE_FRIENDLY");
+    rb_gc_set_copy_on_write_friendly(Qfalse, (gc_stats_ptr ? atoi(gc_stats_ptr) : 0) ? Qtrue : Qfalse);
 
     gc_stats_ptr = getenv("RUBY_GC_STATS");
     if (gc_stats_ptr != NULL) {
@@ -933,6 +944,32 @@ rb_gc_log(self, original_str)
 }
 
 
+/* 
+   Sort heaps by decreasing size, 
+   since larger heaps are more likely to contain valid pointers.
+
+   See the linear searching in is_pointer_to_heap() and
+   find_heap_slot_for_object().
+*/
+static int heaps_slot_cmp(const void *a, const void *b)
+{
+    return ((const struct heaps_slot*) b)->limit - ((const struct heaps_slot*) a)->limit;
+}
+
+static void
+sort_heaps()
+{
+    if ( ! sort_heaps_enabled ) return;
+
+    qsort(heaps, heaps_used, sizeof(heaps[0]), heaps_slot_cmp);
+    if ( sort_heaps_enabled > 1 ) {
+        int i;
+	fprintf(stderr,  "\nsort_heaps()\n:");
+        for ( i = 0; i < heaps_used; ++ i ) {
+	    fprintf(stderr, "heaps[%d] => { %p, %lu }\n", (int) i, (void*) heaps[i].membase, (unsigned long) heaps[i].limit);
+        }
+    }
+}
 
 static void
 add_heap()
@@ -978,6 +1015,7 @@ add_heap()
         heaps[heaps_used].marks = (int *) calloc(heaps[heaps_used].marks_size, sizeof(int));
 	break;
     }
+    sort_heaps();
     pend = p + heap_slots;
     if (lomem == 0 || lomem > p) lomem = p;
     if (himem < pend) himem = pend;
@@ -1734,6 +1772,7 @@ free_unused_heaps()
 	    j++;
 	}
     }
+    sort_heaps();
 }
 
 void rb_gc_abort_threads(void);
