@@ -3024,23 +3024,27 @@ static VALUE
 fix_gcd(int argc, VALUE *argv, VALUE self) {
   if ( argc != 1 ) {
     rb_raise(rb_eArgError, "wrong number of arguments (%d for %d)", argc, 1);
-  }
-  /* Handle Fixnum#gcd(Fixnum) here. */
-  if ( FIXNUM_P(argv[0]) ) {
-    /* fprintf(stderr, "Using Fixnum#gcd(Fixnum)\n"); */
+  } else {
+    /* Handle Fixnum#gcd(Fixnum) here. 
+     * Note: Cannot handle FIXNUM_MIN here due to overflow during negation.
+     */
     long a = FIX2LONG(self);
     long b = FIX2LONG(argv[0]);
-    long min = a < 0 ? - a : a;
-    long max = b < 0 ? - b : b;
-    while ( min > 0 ) {
-      int tmp = min;
-      min = max % min;
-      max = tmp;
+
+    if ( a != FIXNUM_MIN && FIXNUM_P(argv[0]) && b != FIXNUM_MIN ) {
+      /* fprintf(stderr, "Using Fixnum#gcd(Fixnum)\n"); */
+      long min = a < 0 ? - a : a;
+      long max = b < 0 ? - b : b;
+      while ( min > 0 ) {
+	int tmp = min;
+	min = max % min;
+	max = tmp;
+      }
+      return LONG2FIX(max);
+    } else {
+      /* Delegate to Integer#gcd. */
+      return rb_call_super(1, argv);
     }
-    return LONG2FIX(max);
-  } else {
-    /* Delegate to Integer#gcd. */
-    return rb_call_super(1, argv);
   }
 }
 
