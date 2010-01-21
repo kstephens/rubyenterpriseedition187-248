@@ -1,3 +1,13 @@
+Fri Jan 22 04:16:25 2010  Kurt A. Stephens  <ks.ruby@kurtstephens.com>
+
+	* gc.c (sort_heaps): Sort heap_slots[] by decreasing size to
+	  reduce average time spent in is_pointer_to_heap().
+	  [ruby-core:27545]
+	* numeric.c (fixnum_gcd): Specialize Integer#gcd for Fixnum arguments.
+	  [ruby-core:27437]
+	* rational.rb: Improve Rational by reducing inlining operations and extra objects.
+	  [ruby-core:27437]
+
 Fri Jan  8 18:51:11 2010  Nobuyoshi Nakada  <nobu@ruby-lang.org>
 
 	* io.c (io_fwrite): preserve errno.  [ruby-core:27425]

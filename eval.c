@@ -11133,6 +11133,8 @@ rb_thread_die(th)
     th->status = THREAD_KILLED;
 }
 
+static int thread_init;
+
 static void
 rb_thread_remove(th)
     rb_thread_t th;
